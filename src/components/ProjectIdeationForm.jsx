@@ -269,7 +269,7 @@ export default function ProjectIdeationForm({
       <div style={{ marginBottom: "14px" }}>
         <label style={labelStyle}>۸. تو برای این پروژه چه کسی هستی؟</label>
         <p style={subtitleStyle}>
-          مثال: «من برای <strong>{values.title}</strong> ... هستم.» لطفاً مثل این الگو بنویسید و با یک جمله
+          مثال: «من برای <strong>{values.title}</strong> .................... هستم.» لطفاً مثل این الگو بنویسید و با یک جمله
           نقش و حضور خودت را در این پروژه تعریف کنید.
         </p>
         <textarea
