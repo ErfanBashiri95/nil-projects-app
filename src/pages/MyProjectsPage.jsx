@@ -431,7 +431,7 @@ export default function MyProjectsPage({ participantId, participantName }) {
             <ul style={{ paddingRight: "18px", margin: "8px 0 0" }}>
               <li>می‌توانید چندین پروژه گمانه‌زنی کنید.</li>
               <li>می‌توانید پروژه‌ی خود را چندین بار آپدیت کنید و مجدد فرم را پر کنید.</li>
-              <li>در نوشتن خود را محدود نکنید؛ آزاد و خلاق بنویسید.</li>
+              <li>در نوشتن،خود را محدود نکنید.</li>
             </ul>
           </div>
 
