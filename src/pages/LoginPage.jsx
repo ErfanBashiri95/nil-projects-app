@@ -20,7 +20,7 @@ export default function LoginPage() {
     const { data, error } = await supabase
       .from("nilproject_participants")
       .select("*")
-      .eq("username", trimmed)
+      .ilike("username", trimmed)
       .maybeSingle();
 
     console.log("login result", { data, error });
