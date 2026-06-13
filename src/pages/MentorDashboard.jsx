@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supabaseClient";
 
 export default function MentorDashboard({ mentor }) {
   const navigate = useNavigate();
@@ -8,7 +7,10 @@ export default function MentorDashboard({ mentor }) {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
 
-  const isSuper = mentor?.canViewAll === true;
+  const isSuper =
+    mentor?.canViewAll === true ||
+    mentor?.canViewAll === 1 ||
+    mentor?.canViewAll === "1";
 
   useEffect(() => {
     if (!mentor?.username) return;
@@ -17,34 +19,48 @@ export default function MentorDashboard({ mentor }) {
   }, [mentor?.username]);
 
   async function fetchParticipants() {
+
+    console.log("MENTOR =", mentor);
+    console.log("isSuper =", isSuper);
+
     setLoading(true);
 
-    let query = supabase.from("nilproject_participants").select("*");
+    try {
+      const response = await fetch(
+        `/nil-project/api/mentor-participants.php?mentor_username=${encodeURIComponent(
+          mentor.username
+        )}&can_view_all=${isSuper ? 1 : 0}`
+      );
 
-    if (!isSuper) {
-      // رهیار معمولی فقط گروه خودش را می‌بیند
-      query = query.eq("mentor_username", mentor.username);
+      const result = await response.json();
+
+      if (!result.success) {
+        alert("خطا در بارگذاری لیست شرکت‌کننده‌ها");
+        setParticipants([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log("RESULT =", result);
+      console.log("PARTICIPANTS =", result.participants);
+      console.log("COUNT =", result.participants?.length);
+
+      setParticipants(result.participants || []);
+    } catch (err) {
+      console.error("Error loading participants", err);
+      alert("خطا در ارتباط با سرور");
+      setParticipants([]);
     }
 
-    const { data, error } = await query.order("full_name", {
-      ascending: true,
-    });
-
-    if (error) {
-      console.error("Error loading participants", error);
-      alert("خطا در بارگذاری لیست شرکت‌کننده‌ها");
-      setLoading(false);
-      return;
-    }
-
-    setParticipants(data || []);
     setLoading(false);
   }
 
+
   function handleLogout() {
     localStorage.removeItem("mentorInfo");
-    window.location.href = "/mentor-login";
+    window.location.href = "/nil-project/mentor-login";
   }
+
 
   function handleOpenParticipant(p) {
     navigate(`/mentor/user/${p.id}`);

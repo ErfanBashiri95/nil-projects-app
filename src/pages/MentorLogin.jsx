@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "../supabaseClient";
 
 export default function MentorLogin({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -11,32 +10,45 @@ export default function MentorLogin({ onLogin }) {
     setErrorMsg("");
     setLoading(true);
 
-    // 1) جستجو در جدول رهیارها
-    const { data, error } = await supabase
-      .from("nilproject_learning_mentors")
-      .select("*")
-      .eq("username", username.trim().toLowerCase())
-      .maybeSingle();
+    const trimmed = username.trim().toLowerCase();
 
-    if (error) {
+    if (!trimmed) {
+      setErrorMsg("لطفاً نام‌کاربری رهیار را وارد کنید.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/nil-project/api/mentor-login.php?username=${encodeURIComponent(trimmed)}`
+      );
+
+      const result = await response.json();
+
+      if (!result.success || !result.mentor) {
+        setErrorMsg("این نام‌کاربری در لیست رهیارها یافت نشد.");
+        setLoading(false);
+        return;
+      }
+
+      const data = result.mentor;
+
+      onLogin({
+        username: data.username,
+        role: data.role || "mentor",
+        canViewAll:
+          data.can_view_all === true ||
+          data.can_view_all === 1 ||
+          data.can_view_all === "1" ||
+          data.can_view_all === "true",
+        mentorId: data.id,
+        full_name: data.full_name,
+      });
+
+    } catch (err) {
+      console.error("Mentor login error:", err);
       setErrorMsg("مشکل در ارتباط با سرور.");
-      setLoading(false);
-      return;
     }
-
-    if (!data) {
-      setErrorMsg("این نام‌کاربری در لیست رهیارها یافت نشد.");
-      setLoading(false);
-      return;
-    }
-
-    // موفق → مسیر بعدی
-    onLogin({
-      username: data.username,
-      role: data.role,
-      canViewAll: data.can_view_all,
-      mentorId: data.id,
-    });
 
     setLoading(false);
   }

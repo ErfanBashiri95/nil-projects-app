@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "../supabaseClient";
 import MyProjectsPage from "./MyProjectsPage";
 
 export default function LoginPage() {
@@ -12,30 +11,38 @@ export default function LoginPage() {
     setError("");
 
     const trimmed = username.trim();
+
     if (!trimmed) {
       setError("لطفاً نام کاربری را وارد کنید");
       return;
     }
 
-    const { data, error } = await supabase
-      .from("nilproject_participants")
-      .select("*")
-      .ilike("username", trimmed)
-      .maybeSingle();
+    try {
+      const response = await fetch(
+        `/nil-project/api/participant-login.php?username=${encodeURIComponent(trimmed)}`
+      );
 
-    console.log("login result", { data, error });
+      const result = await response.json();
 
-    if (error || !data) {
-      setError("نام کاربری یافت نشد");
-      return;
+      if (!result.success || !result.participant) {
+        setError("نام کاربری یافت نشد");
+        return;
+      }
+
+      setParticipant(result.participant);
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("خطا در ارتباط با سرور");
     }
-
-    setParticipant(data);
   }
 
-  // اگر لاگین شده، برو تو صفحه پروژه‌ها
   if (participant) {
-    return <MyProjectsPage participantId={participant.id} participantName={participant.full_name} />;
+    return (
+      <MyProjectsPage
+        participantId={participant.id}
+        participantName={participant.full_name}
+      />
+    );
   }
 
   return (
@@ -71,6 +78,7 @@ export default function LoginPage() {
         >
           ورود به پنل پروژه‌ها
         </h1>
+
         <p
           style={{
             margin: "0 0 24px",
@@ -94,6 +102,7 @@ export default function LoginPage() {
           >
             نام کاربری
           </label>
+
           <input
             type="text"
             value={username}
@@ -115,7 +124,6 @@ export default function LoginPage() {
               e.target.style.borderColor = "rgba(148,163,184,0.8)";
               e.target.style.boxShadow = "none";
             }}
-            
           />
 
           {error && (

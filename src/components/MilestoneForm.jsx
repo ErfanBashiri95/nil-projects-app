@@ -1,225 +1,232 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
-// این لیست رسمی همه‌ی سؤال‌هاست؛
 export const MILESTONE_FIELDS = [
   {
     key: "vision_beyond_8months",
     label:
       "۰. اگر چشم‌اندازتان بزرگ‌تر از بازهٔ ۸ ماهه است، نتایج مشخص و قابل اندازه‌گیری را همراه با ذکر تاریخ بنویسید.",
-    subtitle: "",
+    hasDate: true,
   },
-
-  // ماه ۸ – مرداد ۱۴۰۵
   {
     key: "m8_month_end",
     label:
-      "۱. بعد از پایان ماه هشتم از شروع پروژه (پایان هفته چهارم مرداد)، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
-    subtitle: "مورخ جمعه ۳۰ مرداد ۱۴۰۵",
+      "۱. بعد از پایان ماه هشتم از شروع پروژه، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m8_w3",
-    label: "۲. پایان هفته سوم مرداد را بنویسید.",
-    subtitle: "مورخ جمعه ۲۳ مرداد ۱۴۰۵",
+    label: "۲. پایان هفته سوم ماه هشتم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m8_w2",
-    label: "۳. پایان هفته دوم مرداد را بنویسید.",
-    subtitle: "مورخ جمعه ۱۶ مرداد ۱۴۰۵",
+    label: "۳. پایان هفته دوم ماه هشتم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m8_w1",
-    label: "۴. پایان هفته اول مرداد را بنویسید.",
-    subtitle: "مورخ جمعه ۹ مرداد ۱۴۰۵",
+    label: "۴. پایان هفته اول ماه هشتم را بنویسید.",
+    hasDate: true,
   },
-
-  // ماه ۷ – تیر ۱۴۰۵
   {
     key: "m7_month_end",
     label:
-      "۵. بعد از پایان ماه هفتم از شروع پروژه (پایان هفته پنجم تیر)، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
-    subtitle: "مورخ جمعه ۲ مرداد ۱۴۰۵",
-  },
-  {
-    key: "m7_w4",
-    label: "۶. پایان هفته چهارم تیر را بنویسید.",
-    subtitle: "مورخ جمعه ۲۶ تیر ۱۴۰۵",
+      "۵. بعد از پایان ماه هفتم از شروع پروژه، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m7_w3",
-    label: "۷. پایان هفته سوم تیر را بنویسید.",
-    subtitle: "مورخ جمعه ۱۹ تیر ۱۴۰۵",
+    label: "۶. پایان هفته سوم ماه هفتم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m7_w2",
-    label: "۸. پایان هفته دوم تیر را بنویسید.",
-    subtitle: "مورخ جمعه ۱۲ تیر ۱۴۰۵",
+    label: "۷. پایان هفته دوم ماه هفتم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m7_w1",
-    label: "۹. پایان هفته اول تیر را بنویسید.",
-    subtitle: "مورخ جمعه ۵ تیر ۱۴۰۵",
+    label: "۸. پایان هفته اول ماه هفتم را بنویسید.",
+    hasDate: true,
   },
-
-  // ماه ۶ – خرداد ۱۴۰۵
   {
     key: "m6_month_end",
     label:
-      "۱۰. بعد از پایان ماه ششم از شروع پروژه (پایان هفته چهارم خرداد)، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
-    subtitle: "مورخ جمعه ۲۹ خرداد ۱۴۰۵",
+      "۹. بعد از پایان ماه ششم از شروع پروژه، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m6_w3",
-    label: "۱۱. پایان هفته سوم خرداد را بنویسید.",
-    subtitle: "مورخ جمعه ۲۲ خرداد ۱۴۰۵",
+    label: "۱۰. پایان هفته سوم ماه ششم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m6_w2",
-    label: "۱۲. پایان هفته دوم خرداد را بنویسید.",
-    subtitle: "مورخ جمعه ۱۵ خرداد ۱۴۰۵",
+    label: "۱۱. پایان هفته دوم ماه ششم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m6_w1",
-    label: "۱۳. پایان هفته اول خرداد را بنویسید.",
-    subtitle: "مورخ جمعه ۸ خرداد ۱۴۰۵",
+    label: "۱۲. پایان هفته اول ماه ششم را بنویسید.",
+    hasDate: true,
   },
-
-  // ماه ۵ – اردیبهشت ۱۴۰۵
   {
     key: "m5_month_end",
     label:
-      "۱۴. بعد از پایان ماه پنجم از شروع پروژه (پایان هفته پنجم اردیبهشت)، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
-    subtitle: "مورخ جمعه ۱ خرداد ۱۴۰۵",
-  },
-  {
-    key: "m5_w4",
-    label: "۱۵. پایان هفته چهارم اردیبهشت را بنویسید.",
-    subtitle: "مورخ جمعه ۲۵ اردیبهشت ۱۴۰۵",
+      "۱۳. بعد از پایان ماه پنجم از شروع پروژه، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m5_w3",
-    label: "۱۶. پایان هفته سوم اردیبهشت را بنویسید.",
-    subtitle: "مورخ جمعه ۱۸ اردیبهشت ۱۴۰۵",
+    label: "۱۴. پایان هفته سوم ماه پنجم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m5_w2",
-    label: "۱۷. پایان هفته دوم اردیبهشت را بنویسید.",
-    subtitle: "مورخ جمعه ۱۱ اردیبهشت ۱۴۰۵",
+    label: "۱۵. پایان هفته دوم ماه پنجم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m5_w1",
-    label: "۱۸. پایان هفته اول اردیبهشت را بنویسید.",
-    subtitle: "مورخ جمعه ۴ اردیبهشت ۱۴۰۵",
+    label: "۱۶. پایان هفته اول ماه پنجم را بنویسید.",
+    hasDate: true,
   },
-
-  // ماه ۴ – فروردین ۱۴۰۵
   {
     key: "m4_month_end",
     label:
-      "۱۹. بعد از پایان ماه چهارم از شروع پروژه (پایان هفته چهارم فروردین)، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
-    subtitle: "مورخ جمعه ۲۸ فروردین ۱۴۰۵",
+      "۱۷. بعد از پایان ماه چهارم از شروع پروژه، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m4_w3",
-    label: "۲۰. پایان هفته سوم فروردین را بنویسید.",
-    subtitle: "مورخ جمعه ۲۱ فروردین ۱۴۰۵",
+    label: "۱۸. پایان هفته سوم ماه چهارم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m4_w2",
-    label: "۲۱. پایان هفته دوم فروردین را بنویسید.",
-    subtitle: "مورخ جمعه ۱۴ فروردین ۱۴۰۵",
+    label: "۱۹. پایان هفته دوم ماه چهارم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m4_w1",
-    label: "۲۲. پایان هفته اول فروردین را بنویسید.",
-    subtitle: "مورخ جمعه ۷ فروردین ۱۴۰۵",
+    label: "۲۰. پایان هفته اول ماه چهارم را بنویسید.",
+    hasDate: true,
   },
-
-  // ماه ۳ – اسفند ۱۴۰۴
   {
     key: "m3_month_end",
     label:
-      "۲۳. بعد از پایان ماه سوم از شروع پروژه (پایان هفته چهارم اسفند)، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
-    subtitle: "مورخ جمعه ۲۹ اسفند ۱۴۰۴",
+      "۲۱. بعد از پایان ماه سوم از شروع پروژه، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m3_w3",
-    label: "۲۴. پایان هفته سوم اسفند را بنویسید.",
-    subtitle: "مورخ جمعه ۲۲ اسفند ۱۴۰۴",
+    label: "۲۲. پایان هفته سوم ماه سوم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m3_w2",
-    label: "۲۵. پایان هفته دوم اسفند را بنویسید.",
-    subtitle: "مورخ جمعه ۱۵ اسفند ۱۴۰۴",
+    label: "۲۳. پایان هفته دوم ماه سوم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m3_w1",
-    label: "۲۶. پایان هفته اول اسفند را بنویسید.",
-    subtitle: "مورخ جمعه ۸ اسفند ۱۴۰۴",
+    label: "۲۴. پایان هفته اول ماه سوم را بنویسید.",
+    hasDate: true,
   },
-
-  // ماه ۲ – بهمن ۱۴۰۴
   {
     key: "m2_month_end",
     label:
-      "۲۷. بعد از پایان ماه دوم از شروع پروژه (پایان هفته چهارم بهمن)، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
-    subtitle: "مورخ جمعه ۱ اسفند ۱۴۰۴",
+      "۲۵. بعد از پایان ماه دوم از شروع پروژه، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m2_w3",
-    label: "۲۸. پایان هفته سوم بهمن را بنویسید.",
-    subtitle: "مورخ جمعه ۲۴ بهمن ۱۴۰۴",
+    label: "۲۶. پایان هفته سوم ماه دوم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m2_w2",
-    label: "۲۹. پایان هفته دوم بهمن را بنویسید.",
-    subtitle: "مورخ جمعه ۱۷ بهمن ۱۴۰۴",
+    label: "۲۷. پایان هفته دوم ماه دوم را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m2_w1",
-    label: "۳۰. پایان هفته اول بهمن را بنویسید.",
-    subtitle: "مورخ جمعه ۱۰ بهمن ۱۴۰۴",
+    label: "۲۸. پایان هفته اول ماه دوم را بنویسید.",
+    hasDate: true,
   },
-
-  // ماه ۱ – دی ۱۴۰۴
   {
     key: "m1_month_end",
     label:
-      "۳۱. بعد از پایان ماه اول از شروع پروژه (پایان هفته پنجم دی)، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
-    subtitle: "مورخ جمعه ۳ بهمن ۱۴۰۴",
-  },
-  {
-    key: "m1_w4",
-    label: "۳۲. پایان هفته چهارم دی را بنویسید.",
-    subtitle: "مورخ جمعه ۲۶ دی ۱۴۰۴",
+      "۲۹. بعد از پایان ماه اول از شروع پروژه، نتایج مشخص و قابل اندازه‌گیری را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m1_w3",
-    label: "۳۳. پایان هفته سوم دی را بنویسید.",
-    subtitle: "مورخ جمعه ۱۹ دی ۱۴۰۴",
+    label: "۳۰. پایان هفته سوم ماه اول را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m1_w2",
-    label: "۳۴. پایان هفته دوم دی را بنویسید.",
-    subtitle: "مورخ جمعه ۱۲ دی ۱۴۰۴",
+    label: "۳۱. پایان هفته دوم ماه اول را بنویسید.",
+    hasDate: true,
   },
   {
     key: "m1_w1",
-    label: "۳۵. پایان هفته اول دی را بنویسید.",
-    subtitle: "مورخ جمعه ۵ دی ۱۴۰۴",
+    label: "۳۲. پایان هفته اول ماه اول را بنویسید.",
+    hasDate: true,
   },
 ];
 
-export default function MilestoneForm({ project, participantId, onSubmit, onCancel }) {
+
+export default function MilestoneForm({ project, initialEntry = null, onSubmit, onCancel }) {
+
   const todayFa = useMemo(() => new Date().toLocaleDateString("fa-IR"), []);
 
   const [answers, setAnswers] = useState(() => {
     const init = {};
-    MILESTONE_FIELDS.forEach((f) => (init[f.key] = ""));
+    MILESTONE_FIELDS.forEach((f) => {
+      init[f.key] = {
+        date: "",
+        text: "",
+      };
+    });
     return init;
   });
 
-  function handleChange(key, value) {
-    setAnswers((prev) => ({ ...prev, [key]: value }));
+  useEffect(() => {
+    if (!initialEntry) return;
+
+    const loadedAnswers = {};
+    MILESTONE_FIELDS.forEach((f) => {
+      const current = initialEntry.answers?.[f.key] || {};
+      loadedAnswers[f.key] = {
+        date: current.date || "",
+        text: current.text || "",
+      };
+    });
+
+    setAnswers(loadedAnswers);
+  }, [initialEntry]);
+
+
+  function handleTextChange(key, value) {
+    setAnswers((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        text: value,
+      },
+    }));
+  }
+
+  function handleDateChange(key, value) {
+    setAnswers((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        date: value,
+      },
+    }));
   }
 
   function handleSubmit(e) {
@@ -275,46 +282,71 @@ export default function MilestoneForm({ project, participantId, onSubmit, onCanc
         تاریخ پر کردن فرم: <strong>{todayFa}</strong>
       </p>
 
-      {MILESTONE_FIELDS.map((field) => (
-        <div key={field.key} style={{ marginBottom: "14px" }}>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "4px",
-              fontSize: "14px",
-              fontWeight: 700,
-              color: "#111827",
-            }}
-          >
-            {field.label}
-          </label>
-          {field.subtitle && (
-            <p
+      <p
+        style={{
+          margin: "0 0 14px",
+          fontSize: "12px",
+          color: "#4b5563",
+          lineHeight: 1.8,
+          padding: "10px 12px",
+          borderRadius: "12px",
+          background: "#f9fafb",
+          border: "1px solid rgba(226,232,240,0.9)",
+        }}
+      >
+        در این نسخه، تاریخ‌ها از قبل تعیین نشده‌اند. لطفاً برای هر مایل‌ستون،
+        تاریخ هدف را خودتان به صورت شمسی وارد کنید؛ مثال: ۱۴۰۵/۰۲/۱۰
+      </p>
+
+      {MILESTONE_FIELDS.map((field) => {
+        const value = answers[field.key] || { date: "", text: "" };
+
+        return (
+          <div key={field.key} style={{ marginBottom: "14px" }}>
+            <label
               style={{
-                margin: "0 0 6px",
-                fontSize: "12px",
-                color: "#6b7280",
-                lineHeight: 1.7,
+                display: "block",
+                marginBottom: "4px",
+                fontSize: "14px",
+                fontWeight: 700,
+                color: "#111827",
               }}
             >
-              {field.subtitle}
-            </p>
-          )}
-          <textarea
-            value={answers[field.key]}
-            onChange={(e) => handleChange(field.key, e.target.value)}
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              borderRadius: "10px",
-              border: "1px solid rgba(148,163,184,0.8)",
-              fontSize: "13px",
-              minHeight: "70px",
-              resize: "vertical",
-            }}
-          />
-        </div>
-      ))}
+              {field.label}
+            </label>
+
+            <input
+              type="text"
+              value={value.date}
+              onChange={(e) => handleDateChange(field.key, e.target.value)}
+              placeholder="تاریخ هدف به شمسی؛ مثلا ۱۴۰۵/۰۲/۱۰"
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: "10px",
+                border: "1px solid rgba(148,163,184,0.8)",
+                fontSize: "13px",
+                marginBottom: "6px",
+              }}
+            />
+
+            <textarea
+              value={value.text}
+              onChange={(e) => handleTextChange(field.key, e.target.value)}
+              placeholder="نتیجه مشخص و قابل اندازه‌گیری را بنویسید."
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: "10px",
+                border: "1px solid rgba(148,163,184,0.8)",
+                fontSize: "13px",
+                minHeight: "70px",
+                resize: "vertical",
+              }}
+            />
+          </div>
+        );
+      })}
 
       <div style={{ marginTop: "10px", display: "flex", gap: "8px" }}>
         <button
@@ -330,7 +362,8 @@ export default function MilestoneForm({ project, participantId, onSubmit, onCanc
             cursor: "pointer",
           }}
         >
-          ثبت مایل‌ستون
+          {initialEntry ? "ذخیره ویرایش مایل‌ستون" : "ثبت مایل‌ستون"}
+
         </button>
 
         <button

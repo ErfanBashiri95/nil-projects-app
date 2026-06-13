@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
 import { MILESTONE_FIELDS } from "../components/MilestoneForm";
 import { WEEKLY_TASK_FIELDS } from "../components/WeeklyForm";
 
@@ -22,105 +21,47 @@ export default function MentorParticipantPage({ mentor, participantId }) {
   async function loadAll() {
     setLoading(true);
 
-    // 1) خود شرکت‌کننده
-    const { data: pData, error: pErr } = await supabase
-      .from("nilproject_participants")
-      .select("*")
-      .eq("id", participantId)
-      .maybeSingle();
+    try {
+      const response = await fetch(
+        `/nil-project/api/mentor-participant-detail.php?participant_id=${encodeURIComponent(
+          participantId
+        )}&mentor_username=${encodeURIComponent(
+          mentor.username
+        )}&can_view_all=${isSuper ? 1 : 0}`
+      );
 
-    if (pErr) {
-      console.error("Error loading participant", pErr);
-      alert("خطا در دریافت اطلاعات شرکت‌کننده.");
-      setLoading(false);
-      return;
+      const result = await response.json();
+
+      if (!result.success) {
+        alert("خطا در دریافت اطلاعات شرکت‌کننده.");
+        setLoading(false);
+        return;
+      }
+
+      setParticipant(result.participant);
+      setProjects(result.projects || []);
+
+      const msByProj = {};
+      (result.milestones || []).forEach((m) => {
+        if (!msByProj[m.project_id]) msByProj[m.project_id] = [];
+        msByProj[m.project_id].push(m);
+      });
+      setMilestonesByProject(msByProj);
+
+      const wByProj = {};
+      (result.weekly || []).forEach((w) => {
+        if (!wByProj[w.project_id]) wByProj[w.project_id] = [];
+        wByProj[w.project_id].push(w);
+      });
+      setWeeklyByProject(wByProj);
+    } catch (err) {
+      console.error("Error loading participant detail:", err);
+      alert("خطا در ارتباط با سرور.");
     }
-    if (!pData) {
-      alert("شرکت‌کننده‌ای با این شناسه پیدا نشد.");
-      setLoading(false);
-      return;
-    }
-
-    // 2) در صورت رهیار معمولی، چک کنیم این شرکت‌کننده واقعاً زیرمجموعه‌اش است
-    if (!isSuper && pData.mentor_username !== mentor.username) {
-      alert("شما مجاز به مشاهده اطلاعات این شرکت‌کننده نیستید.");
-      setLoading(false);
-      return;
-    }
-
-    setParticipant(pData);
-
-    // 3) پروژه‌های این شرکت‌کننده
-    const { data: projData, error: projErr } = await supabase
-      .from("nilproject_projects")
-      .select("*")
-      .eq("participant_id", participantId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
-
-    if (projErr) {
-      console.error("Error loading projects", projErr);
-      alert("خطا در دریافت پروژه‌های این شرکت‌کننده.");
-      setLoading(false);
-      return;
-    }
-
-    setProjects(projData || []);
-
-    const projectIds = (projData || []).map((p) => p.id);
-    if (projectIds.length === 0) {
-      setMilestonesByProject({});
-      setWeeklyByProject({});
-      setLoading(false);
-      return;
-    }
-
-    // 4) مایل‌ستون‌ها
-    const { data: msData, error: msErr } = await supabase
-      .from("nilproject_milestone_entries")
-      .select("*")
-      .eq("participant_id", participantId)
-      .in("project_id", projectIds)
-      .order("created_at", { ascending: false });
-
-    if (msErr) {
-      console.error("Error loading milestones", msErr);
-      alert("خطا در دریافت مایل‌ستون‌ها.");
-      setLoading(false);
-      return;
-    }
-
-    const msByProj = {};
-    (msData || []).forEach((m) => {
-      if (!msByProj[m.project_id]) msByProj[m.project_id] = [];
-      msByProj[m.project_id].push(m);
-    });
-    setMilestonesByProject(msByProj);
-
-    // 5) عملکردهای هفتگی
-    const { data: wData, error: wErr } = await supabase
-      .from("nilproject_weekly_entries")
-      .select("*")
-      .eq("participant_id", participantId)
-      .in("project_id", projectIds)
-      .order("week_start", { ascending: false });
-
-    if (wErr) {
-      console.error("Error loading weekly entries", wErr);
-      alert("خطا در دریافت عملکرد هفتگی.");
-      setLoading(false);
-      return;
-    }
-
-    const wByProj = {};
-    (wData || []).forEach((w) => {
-      if (!wByProj[w.project_id]) wByProj[w.project_id] = [];
-      wByProj[w.project_id].push(w);
-    });
-    setWeeklyByProject(wByProj);
 
     setLoading(false);
   }
+
 
   function toggleProject(id) {
     setExpandedProjectId((prev) => (prev === id ? null : id));
@@ -156,7 +97,7 @@ export default function MentorParticipantPage({ mentor, participantId }) {
               color: "#111827",
             }}
           >
-            پروفایل 
+            پروفایل
           </h1>
           {participant && (
             <p
@@ -166,7 +107,7 @@ export default function MentorParticipantPage({ mentor, participantId }) {
                 color: "#111827",
               }}
             >
-              {participant.full_name} 
+              {participant.full_name}
             </p>
           )}
           <p
@@ -257,7 +198,7 @@ export default function MentorParticipantPage({ mentor, participantId }) {
               value: p.q9_role_statement,
             },
           ].filter((item) => item.value && String(item.value).trim() !== "");
-          
+
 
           return (
             <div
@@ -301,8 +242,8 @@ export default function MentorParticipantPage({ mentor, participantId }) {
                     {p.updated_at
                       ? new Date(p.updated_at).toLocaleString("fa-IR")
                       : p.created_at
-                      ? new Date(p.created_at).toLocaleString("fa-IR")
-                      : "-"}
+                        ? new Date(p.created_at).toLocaleString("fa-IR")
+                        : "-"}
                   </p>
                   <p
                     style={{

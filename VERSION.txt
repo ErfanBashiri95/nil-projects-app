@@ -1,0 +1,4 @@
+NIL Project V2
+Version: 1.0
+Release Date: 2026-06-14
+Status: Stable

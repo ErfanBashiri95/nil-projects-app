@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 export const WEEKLY_TASK_FIELDS = [
   // 1-1 حیاتی
@@ -51,7 +51,8 @@ export const WEEKLY_TASK_FIELDS = [
   },
 ];
 
-export default function WeeklyForm({ project, onSubmit, onCancel }) {
+export default function WeeklyForm({ project, initialEntry = null, onSubmit, onCancel }) {
+
   const todayFa = useMemo(() => new Date().toLocaleDateString("fa-IR"), []);
 
   // متن تسک‌ها (بدون تیک در UI، ولی در دیتا همچنان done = false می‌ذاریم)
@@ -64,6 +65,23 @@ export default function WeeklyForm({ project, onSubmit, onCancel }) {
   });
 
   const [shareTargets, setShareTargets] = useState("");
+
+  useEffect(() => {
+    if (!initialEntry) return;
+
+    const loadedTasks = {};
+    WEEKLY_TASK_FIELDS.forEach((f) => {
+      const current = initialEntry.tasks?.[f.key] || {};
+      loadedTasks[f.key] = {
+        text: current.text || "",
+        done: !!current.done,
+      };
+    });
+
+    setTasks(loadedTasks);
+    setShareTargets(initialEntry.share_targets || "");
+  }, [initialEntry]);
+
 
   function handleTaskTextChange(key, value) {
     setTasks((prev) => ({
@@ -81,7 +99,7 @@ export default function WeeklyForm({ project, onSubmit, onCancel }) {
       const current = tasks[f.key] || {};
       preparedTasks[f.key] = {
         text: current.text || "",
-        done: false, // در زمان ثبت اولیه همیشه false
+        done: !!current.done,
       };
     });
 
@@ -155,15 +173,15 @@ export default function WeeklyForm({ project, onSubmit, onCancel }) {
       >
         <p style={{ margin: "0 0 6px" }}>این فرم شامل دو بخش است:</p>
         <ul style={{ margin: "0 0 6px", paddingRight: "18px" }}>
-          <li>اقدامات ۱-۳-۵ (۱ اقدام <strong>حیاتی</strong> ، ۳ اقدام <strong>مهم</strong> ، ۵ اقدام <strong>معمولی</strong>)<br/> که شما بر اساس فرم مایل استون که ابتدای هرماه پر می کنید،این اقدامات (Task ها) را اول هر هفته مشخص می کنید و تا پایان هفته انجام می دهید.</li>
+          <li>اقدامات ۱-۳-۵ (۱ اقدام <strong>حیاتی</strong> ، ۳ اقدام <strong>مهم</strong> ، ۵ اقدام <strong>معمولی</strong>)<br /> که شما بر اساس فرم مایل استون که ابتدای هرماه پر می کنید،این اقدامات (Task ها) را اول هر هفته مشخص می کنید و تا پایان هفته انجام می دهید.</li>
           <li>
             نام افرادی که قرار است در هفتهٔ پیش‌رو،شما امکان‌(های) پروژه‌ی خود را با آن‌ها در
             میان بگذارید و آن‌ها را مجذوب کنید.
           </li>
         </ul>
         <p style={{ margin: "0 0 4px" }}>
-          این اقدامات (Task ها) را بر اساس فرم مایل‌ستون ابتدای هر ماه مشخص می‌کنید و 
-           تا پایان هفته آن‌ها را انجام میدهید.
+          این اقدامات (Task ها) را بر اساس فرم مایل‌ستون ابتدای هر ماه مشخص می‌کنید و
+          تا پایان هفته آن‌ها را انجام میدهید.
         </p>
       </div>
 
@@ -181,11 +199,11 @@ export default function WeeklyForm({ project, onSubmit, onCancel }) {
         }}
       >
         <p style={{ margin: "0 0 4px", fontWeight: 700 }}>
-         <strong> یادآوری تفاوت «تسک» و «پروژه»</strong>:
+          <strong> یادآوری تفاوت «تسک» و «پروژه»</strong>:
         </p>
         <p style={{ margin: "0 0 4px" }}>
           <strong>تسک (Task):</strong> فعالیت مشخص، محدود و قابل انجام که معمولاً
-          بخشی از یک پروژه یا فرآیند بزرگ‌تر است.تسک ها معمولا:<br/> -دارای هدف مشخص هستند.<br/>-مدت زمان کوتاه تری نسبت به پروژه دارند.<br/>-به یک یا چند نفر محول می شوند.<br/>-قابل اندازه گیری یا پیگیری هستند.<br/>-ممکن است مستقل یا وابسته به تسک های دیگر باشند.
+          بخشی از یک پروژه یا فرآیند بزرگ‌تر است.تسک ها معمولا:<br /> -دارای هدف مشخص هستند.<br />-مدت زمان کوتاه تری نسبت به پروژه دارند.<br />-به یک یا چند نفر محول می شوند.<br />-قابل اندازه گیری یا پیگیری هستند.<br />-ممکن است مستقل یا وابسته به تسک های دیگر باشند.
         </p>
         <p style={{ margin: "0 0 4px" }}>
           مثال تسک: نوشتن یک ایمیل، طراحی چهار اسلاید پاورپوینت تا ساعت ۲۲،
@@ -193,7 +211,7 @@ export default function WeeklyForm({ project, onSubmit, onCancel }) {
         </p>
         <p style={{ margin: "4px 0 4px" }}>
           <strong>پروژه (Project):</strong> تلاش موقتی و چندمرحله‌ای برای رسیدن به یک
-          نتیجه خاص، محصول یا خدمت انجام می شود؛ پروژه ها:<br/>-معمولا شامل چندین تسک هستند. <br/>-زمانبندی ،منابع،بودجه و خروجی مشخص دارند. <br/>-نیاز به برنامه ریزی و مدیریت دارند. <br/>-ممکن است چند نفر یا تیم های مختلف در آن مشارکت کنند.
+          نتیجه خاص، محصول یا خدمت انجام می شود؛ پروژه ها:<br />-معمولا شامل چندین تسک هستند. <br />-زمانبندی ،منابع،بودجه و خروجی مشخص دارند. <br />-نیاز به برنامه ریزی و مدیریت دارند. <br />-ممکن است چند نفر یا تیم های مختلف در آن مشارکت کنند.
         </p>
         <p style={{ margin: "0" }}>
           مثال پروژه: طراحی و راه‌اندازی یک وب‌سایت، برگزاری یک کارگاه آموزشی،
@@ -308,7 +326,7 @@ export default function WeeklyForm({ project, onSubmit, onCancel }) {
           lineHeight: 1.7,
         }}
       >
-       پروژه خود را به افراد زیر در این هفته معرفی خواهم کرد
+        پروژه خود را به افراد زیر در این هفته معرفی خواهم کرد
       </p>
 
       <textarea
@@ -342,7 +360,8 @@ export default function WeeklyForm({ project, onSubmit, onCancel }) {
             cursor: "pointer",
           }}
         >
-          ثبت عملکرد این هفته
+          {initialEntry ? "ذخیره ویرایش عملکرد هفتگی" : "ثبت عملکرد این هفته"}
+
         </button>
         <button
           type="button"

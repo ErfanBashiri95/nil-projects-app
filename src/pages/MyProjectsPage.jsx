@@ -1,67 +1,135 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
+import { useNavigate } from "react-router-dom"; import api from "../apiClient";
 import ProjectIdeationForm from "../components/ProjectIdeationForm";
 import MilestoneForm, { MILESTONE_FIELDS } from "../components/MilestoneForm";
 import WeeklyForm, { WEEKLY_TASK_FIELDS } from "../components/WeeklyForm";
-import LogoutButton from "../components/LogoutButton";
 
-export default function MyProjectsPage({ participantId, participantName }) {
+export default function MyProjectsPage() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [selectedCourseId, setSelectedCourseId] = useState("");
   const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // گمانه‌زنی
-  const [editingProject, setEditingProject] = useState(null);
-  const [showIdeationForm, setShowIdeationForm] = useState(false);
   const [showIdeationIntro, setShowIdeationIntro] = useState(false);
-
-  // مایل‌ستون: ایجاد
+  const [showIdeationForm, setShowIdeationForm] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
   const [milestoneProject, setMilestoneProject] = useState(null);
-  const [showMilestoneIntro, setShowMilestoneIntro] = useState(false);
-  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
 
-  // مایل‌ستون: مشاهده
-  const [viewMilestonesProject, setViewMilestonesProject] = useState(null);
+  const [showMilestoneIntro, setShowMilestoneIntro] = useState(false);
+
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [editingMilestoneEntry, setEditingMilestoneEntry] = useState(null);
+
+
   const [milestoneEntries, setMilestoneEntries] = useState([]);
+
   const [milestonesLoading, setMilestonesLoading] = useState(false);
 
-  // هفتگی: ایجاد
+  const [viewMilestonesProject, setViewMilestonesProject] = useState(null);
   const [weeklyProject, setWeeklyProject] = useState(null);
+
   const [showWeeklyIntro, setShowWeeklyIntro] = useState(false);
+
   const [showWeeklyForm, setShowWeeklyForm] = useState(false);
 
-  // هفتگی: مشاهده
-  const [weeklyHistoryProject, setWeeklyHistoryProject] = useState(null);
+  const [editingWeeklyEntry, setEditingWeeklyEntry] = useState(null);
+
+
   const [weeklyEntries, setWeeklyEntries] = useState([]);
+
   const [weeklyLoading, setWeeklyLoading] = useState(false);
 
+  const [viewWeeklyProject, setViewWeeklyProject] = useState(null);
+
+
+
   useEffect(() => {
-    if (!participantId) return;
-    fetchProjects();
-  }, [participantId]);
+    loadInitialData();
+  }, []);
 
-  async function fetchProjects() {
+  async function loadInitialData() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("nilproject_projects")
-      .select("*")
-      .eq("participant_id", participantId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error loading projects", error);
-    } else {
-      setProjects(data || []);
+    const meResult = await api.me();
+
+    if (!meResult.success) {
+      alert("برای ورود به نیل پروژه، ابتدا باید در سایت اصلی وارد شوید.");
+      setLoading(false);
+      return;
     }
+
+    setUser(meResult.user);
+
+    const roles = meResult.user?.roles || [];
+
+    if (
+      roles.includes("admin") ||
+      roles.includes("teacher") ||
+      roles.includes("support")
+    ) {
+      navigate(`/overview${window.location.search || ""}`);
+      return;
+    }
+
+
+    const coursesResult = await api.myProjectCourses();
+
+    if (coursesResult.success) {
+      const allCourses = coursesResult.courses || [];
+
+      const params = new URLSearchParams(window.location.search);
+      const urlCourseId = params.get("course_id");
+
+      const allowedCourses = urlCourseId
+        ? allCourses.filter(
+          (course) => String(course.course_id) === String(urlCourseId)
+        )
+        : allCourses;
+
+      setCourses(allowedCourses);
+
+      if (allowedCourses.length > 0) {
+        const selectedId = allowedCourses[0].course_id;
+        setSelectedCourseId(selectedId);
+        await loadProjects(selectedId);
+      } else {
+        setSelectedCourseId("");
+        setProjects([]);
+        alert("برای این دوره دسترسی پروژه پیدا نشد.");
+      }
+    }
+
+
+
     setLoading(false);
   }
 
-  // ---------- گمانه‌زنی پروژه ----------
+  async function loadProjects(courseId = selectedCourseId) {
+    if (!courseId) {
+      setProjects([]);
+      return;
+    }
+
+    const result = await api.projects(courseId);
+
+    if (result.success) {
+      setProjects(result.data || []);
+    } else {
+      setProjects([]);
+    }
+  }
+
 
   function handleCreateNewProject() {
-    setEditingProject(null);
-    setShowIdeationForm(false);
+    if (!selectedCourseId) {
+      alert("اول یک دوره را انتخاب کن.");
+      return;
+    }
+
     setShowIdeationIntro(true);
+    setShowIdeationForm(false);
   }
 
   function handleEditProject(project) {
@@ -71,66 +139,25 @@ export default function MyProjectsPage({ participantId, participantName }) {
   }
 
   async function handleDeleteProject(projectId) {
-    if (!window.confirm("از حذف این پروژه مطمئن هستید؟")) return;
-
-    const { error } = await supabase
-      .from("nilproject_projects")
-      .update({ is_active: false })
-      .eq("id", projectId);
-
-    if (error) {
-      console.error("Error soft-deleting project", error);
-      alert("حذف پروژه با خطا مواجه شد.");
-    } else {
-      fetchProjects();
-    }
-  }
-
-  async function handleIdeationFormSubmit(values, projectId) {
-    if (projectId) {
-      const { error } = await supabase
-        .from("nilproject_projects")
-        .update(values)
-        .eq("id", projectId);
-
-      if (error) {
-        console.error("Error updating project", error);
-        alert("ویرایش پروژه با خطا مواجه شد.");
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from("nilproject_projects")
-        .insert({
-          ...values,
-          participant_id: participantId,
-        });
-
-      if (error) {
-        console.error("Error creating project", error);
-        alert("ثبت پروژه با خطا مواجه شد.");
-        return;
-      }
+    if (!window.confirm("از حذف این پروژه مطمئن هستید؟")) {
+      return;
     }
 
-    setShowIdeationForm(false);
-    setShowIdeationIntro(false);
-    setEditingProject(null);
-    fetchProjects();
-  }
+    const result = await api.deleteProject(projectId);
 
-  function handleIdeationCancel() {
-    setShowIdeationForm(false);
-    setShowIdeationIntro(false);
-    setEditingProject(null);
-  }
+    if (!result.success) {
+      alert(result.message || "حذف پروژه با خطا مواجه شد.");
+      return;
+    }
 
-  // ---------- مایل‌ستون: ثبت ----------
+    alert("پروژه با موفقیت حذف شد.");
+    await loadProjects();
+  }
 
   function handleOpenMilestone(project) {
     setMilestoneProject(project);
-    setShowMilestoneForm(false);
     setShowMilestoneIntro(true);
+    setShowMilestoneForm(false);
   }
 
   function handleMilestoneIntroContinue() {
@@ -139,55 +166,66 @@ export default function MyProjectsPage({ participantId, participantName }) {
   }
 
   function handleMilestoneCancel() {
-    setShowMilestoneForm(false);
-    setShowMilestoneIntro(false);
     setMilestoneProject(null);
+    setShowMilestoneIntro(false);
+    setShowMilestoneForm(false);
   }
 
   async function handleMilestoneSubmit(answers) {
-    if (!participantId || !milestoneProject) return;
+    if (!milestoneProject) return;
 
-    const { error } = await supabase
-      .from("nilproject_milestone_entries")
-      .insert({
-        participant_id: participantId,
-        project_id: milestoneProject.id,
-        period_label: "year1_full_plan",
+    let result;
+
+    if (editingMilestoneEntry) {
+      result = await api.updateMilestone(
+        editingMilestoneEntry.id,
         answers,
-      });
+        editingMilestoneEntry.period_label || "custom_milestone",
+        editingMilestoneEntry.period_start || null
+      );
+    } else {
+      result = await api.saveMilestone(
+        milestoneProject.id,
+        answers,
+        "custom_milestone",
+        null
+      );
+    }
 
-    if (error) {
-      console.error("Error saving milestone", error);
-      alert("ثبت مایل‌ستون با خطا مواجه شد.");
+    if (!result.success) {
+      alert(result.message || "ثبت / ویرایش مایل‌ستون با خطا مواجه شد.");
       return;
     }
 
-    alert("فرم مایل‌ستون با موفقیت ثبت شد.");
-    setShowMilestoneForm(false);
+    alert(
+      editingMilestoneEntry
+        ? "مایل‌ستون با موفقیت ویرایش شد."
+        : "فرم مایل‌ستون با موفقیت ثبت شد."
+    );
+
     setMilestoneProject(null);
+    setEditingMilestoneEntry(null);
+    setShowMilestoneIntro(false);
+    setShowMilestoneForm(false);
+
+    if (viewMilestonesProject) {
+      await handleViewMilestones(viewMilestonesProject);
+    }
   }
 
-  // ---------- مایل‌ستون: مشاهده ----------
 
   async function handleViewMilestones(project) {
-    if (!participantId) return;
-
     setViewMilestonesProject(project);
     setMilestonesLoading(true);
     setMilestoneEntries([]);
 
-    const { data, error } = await supabase
-      .from("nilproject_milestone_entries")
-      .select("*")
-      .eq("participant_id", participantId)
-      .eq("project_id", project.id)
-      .order("created_at", { ascending: false });
+    const result = await api.milestones(project.id);
 
-    if (error) {
-      console.error("Error loading milestones", error);
-      alert("دریافت مایل‌ستون‌های این پروژه با خطا مواجه شد.");
+    if (!result.success) {
+      alert(result.message || "دریافت مایل‌ستون‌ها با خطا مواجه شد.");
+      setMilestoneEntries([]);
     } else {
-      setMilestoneEntries(data || []);
+      setMilestoneEntries(result.data || []);
     }
 
     setMilestonesLoading(false);
@@ -198,12 +236,18 @@ export default function MyProjectsPage({ participantId, participantName }) {
     setMilestoneEntries([]);
   }
 
-  // ---------- هفتگی: ثبت ----------
+  function handleEditMilestone(entry) {
+    setMilestoneProject(projects.find((p) => p.id === entry.project_id) || viewMilestonesProject);
+    setEditingMilestoneEntry(entry);
+    setShowMilestoneIntro(false);
+    setShowMilestoneForm(true);
+  }
+
 
   function handleOpenWeekly(project) {
     setWeeklyProject(project);
-    setShowWeeklyForm(false);
     setShowWeeklyIntro(true);
+    setShowWeeklyForm(false);
   }
 
   function handleWeeklyIntroContinue() {
@@ -212,117 +256,192 @@ export default function MyProjectsPage({ participantId, participantName }) {
   }
 
   function handleWeeklyCancel() {
-    setShowWeeklyForm(false);
-    setShowWeeklyIntro(false);
     setWeeklyProject(null);
+    setShowWeeklyIntro(false);
+    setShowWeeklyForm(false);
   }
 
-  // 🔴 اینجا مهم بود: week_start و share_targets
   async function handleWeeklySubmit({ tasks, share_targets }) {
-    if (!participantId || !weeklyProject) return;
+    if (!weeklyProject) return;
 
     const now = new Date();
-    const weekStart = now.toISOString().slice(0, 10); // YYYY-MM-DD
-    const weekLabel = `هفته منتهی به ${now.toLocaleDateString("fa-IR")}`;
 
-    const { error } = await supabase
-      .from("nilproject_weekly_entries")
-      .insert({
-        participant_id: participantId,
-        project_id: weeklyProject.id,
-        week_start: weekStart,
-        week_label: weekLabel,
+    let result;
+
+    if (editingWeeklyEntry) {
+      result = await api.updateWeekly(
+        editingWeeklyEntry.id,
         tasks,
-        answers: {}, // اگر در آینده سوالات دیگری اضافه شد
-        share_targets, // هم‌نام با ستون دیتابیس
-      });
+        share_targets,
+        editingWeeklyEntry.week_label || "هفته منتهی به " + now.toLocaleDateString("fa-IR"),
+        editingWeeklyEntry.week_start || now.toISOString().slice(0, 10)
+      );
+    } else {
+      result = await api.saveWeekly(
+        weeklyProject.id,
+        tasks,
+        share_targets,
+        "هفته منتهی به " + now.toLocaleDateString("fa-IR"),
+        now.toISOString().slice(0, 10)
+      );
+    }
 
-    if (error) {
-      console.error("Error saving weekly entry", error);
-      alert("ثبت عملکرد هفتگی با خطا مواجه شد.");
+    if (!result.success) {
+      alert(result.message || "ثبت / ویرایش عملکرد هفتگی با خطا مواجه شد.");
       return;
     }
 
-    alert("فرم عملکرد هفتگی با موفقیت ثبت شد.");
-    setShowWeeklyForm(false);
+    alert(editingWeeklyEntry ? "عملکرد هفتگی با موفقیت ویرایش شد." : "عملکرد هفتگی با موفقیت ثبت شد.");
+
     setWeeklyProject(null);
+    setEditingWeeklyEntry(null);
+    setShowWeeklyIntro(false);
+    setShowWeeklyForm(false);
+
+    if (viewWeeklyProject) {
+      await handleViewWeekly(viewWeeklyProject);
+    }
   }
 
-  // ---------- هفتگی: مشاهده/history ----------
 
-  async function handleViewWeeklyHistory(project) {
-    if (!participantId) return;
-
-    setWeeklyHistoryProject(project);
+  async function handleViewWeekly(project) {
+    setViewWeeklyProject(project);
     setWeeklyLoading(true);
     setWeeklyEntries([]);
 
-    const { data, error } = await supabase
-      .from("nilproject_weekly_entries")
-      .select("*")
-      .eq("participant_id", participantId)
-      .eq("project_id", project.id)
-      .order("week_start", { ascending: false });
+    const result = await api.weeklyEntries(project.id);
 
-    if (error) {
-      console.error("Error loading weekly entries", error);
-      alert("دریافت عملکرد هفتگی‌های این پروژه با خطا مواجه شد.");
+    if (!result.success) {
+      alert(result.message || "دریافت عملکردهای هفتگی با خطا مواجه شد.");
+      setWeeklyEntries([]);
     } else {
-      setWeeklyEntries(data || []);
+      setWeeklyEntries(result.data || []);
     }
 
     setWeeklyLoading(false);
   }
 
-  function handleCloseWeeklyHistory() {
-    setWeeklyHistoryProject(null);
+  function handleCloseWeeklyView() {
+    setViewWeeklyProject(null);
     setWeeklyEntries([]);
   }
 
-  async function handleToggleWeeklyTaskDone(entryId, taskKey, newDone) {
-    try {
-      // ۱) پیدا کردن ردیف موردنظر در استیت
-      const targetEntry = weeklyEntries.find((e) => e.id === entryId);
-      if (!targetEntry) return;
-
-      const oldTasks = targetEntry.tasks || {};
-      const oldItem = oldTasks[taskKey];
-      if (!oldItem) return;
-
-      const newTasks = {
-        ...oldTasks,
-        [taskKey]: {
-          ...oldItem,
-          done: newDone,
-        },
-      };
-
-      // ۲) آپدیت در دیتابیس
-      const { data, error } = await supabase
-        .from("nilproject_weekly_entries")
-        .update({ tasks: newTasks })
-        .eq("id", entryId)
-        .select("*")
-        .single();
-
-      if (error) {
-        console.error("Error updating task done:", error);
-        alert("به‌روزرسانی وضعیت تسک با خطا مواجه شد.");
-        return;
-      }
-
-      // ۳) آپدیت استیت لوکال
-      setWeeklyEntries((prev) =>
-        prev.map((e) => (e.id === entryId ? data : e))
-      );
-    } catch (err) {
-      console.error("Unexpected error in handleToggleWeeklyTaskDone:", err);
-      alert("مشکلی در به‌روزرسانی تودولیست رخ داد.");
-    }
+  function handleEditWeekly(entry) {
+    setWeeklyProject(projects.find((p) => p.id === entry.project_id) || viewWeeklyProject);
+    setEditingWeeklyEntry(entry);
+    setShowWeeklyIntro(false);
+    setShowWeeklyForm(true);
   }
 
 
-  // ---------- UI ----------
+  async function handleToggleWeeklyTaskDone(entryId, taskKey, newDone) {
+    const targetEntry = weeklyEntries.find((e) => e.id === entryId);
+    if (!targetEntry) return;
+
+    const oldTasks = targetEntry.tasks || {};
+    const oldItem = oldTasks[taskKey];
+    if (!oldItem) return;
+
+    const newTasks = {
+      ...oldTasks,
+      [taskKey]: {
+        ...oldItem,
+        done: newDone,
+      },
+    };
+
+    const result = await api.updateWeeklyTask(entryId, newTasks);
+
+    if (!result.success) {
+      alert(result.message || "به‌روزرسانی وضعیت تسک با خطا مواجه شد.");
+      return;
+    }
+
+    setWeeklyEntries((prev) =>
+      prev.map((e) =>
+        e.id === entryId
+          ? { ...e, tasks: newTasks }
+          : e
+      )
+    );
+  }
+
+  async function handleDeleteWeekly(entryId) {
+    if (!window.confirm("آیا از حذف این عملکرد هفتگی مطمئن هستید؟")) {
+      return;
+    }
+
+    const result = await api.deleteWeekly(entryId);
+
+    if (!result.success) {
+      alert(result.message || "حذف عملکرد هفتگی با خطا مواجه شد.");
+      return;
+    }
+
+    setWeeklyEntries((prev) =>
+      prev.filter((entry) => entry.id !== entryId)
+    );
+
+    alert("عملکرد هفتگی حذف شد.");
+  }
+
+  async function handleDeleteMilestone(entryId) {
+    if (!window.confirm("آیا از حذف این مایل‌ستون مطمئن هستید؟")) {
+      return;
+    }
+
+    const result = await api.deleteMilestone(entryId);
+
+    if (!result.success) {
+      alert(result.message || "حذف مایل‌ستون با خطا مواجه شد.");
+      return;
+    }
+
+    setMilestoneEntries((prev) =>
+      prev.filter((entry) => entry.id !== entryId)
+    );
+
+    alert("مایل‌ستون حذف شد.");
+  }
+
+
+
+
+
+
+
+
+
+
+  async function handleIdeationFormSubmit(values) {
+    const result = await api.saveProject(selectedCourseId, values, editingProject?.id || null);
+
+    if (!result.success) {
+      alert(result.message || "ثبت پروژه با خطا مواجه شد.");
+      return;
+    }
+
+    alert("پروژه با موفقیت ثبت شد.");
+
+    setShowIdeationForm(false);
+    setShowIdeationIntro(false);
+    setEditingProject(null);
+
+    await loadProjects();
+  }
+
+  function handleIdeationCancel() {
+    setShowIdeationIntro(false);
+    setShowIdeationForm(false);
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: "24px", maxWidth: "960px", margin: "0 auto" }}>
+        در حال بارگذاری...
+      </div>
+    );
+  }
 
   return (
     <div
@@ -333,7 +452,6 @@ export default function MyProjectsPage({ participantId, participantName }) {
         margin: "0 auto",
       }}
     >
-      {/* هدر */}
       <header
         style={{
           display: "flex",
@@ -354,7 +472,8 @@ export default function MyProjectsPage({ participantId, participantName }) {
           >
             پنل پروژه‌های من
           </h1>
-          {participantName && (
+
+          {user && (
             <p
               style={{
                 margin: "4px 0 0",
@@ -362,7 +481,7 @@ export default function MyProjectsPage({ participantId, participantName }) {
                 color: "#111827",
               }}
             >
-              خوش آمدی، {participantName} 🌱
+              خوش آمدی، {user.full_name || user.username} 🌱
             </p>
           )}
         </div>
@@ -385,7 +504,52 @@ export default function MyProjectsPage({ participantId, participantName }) {
         </button>
       </header>
 
-      {/* کارت مقدمه گمانه‌زنی */}
+      <section
+        style={{
+          marginBottom: "16px",
+          padding: "14px",
+          borderRadius: "16px",
+          background: "rgba(255,255,255,0.95)",
+          border: "1px solid rgba(226,232,240,0.9)",
+          boxShadow: "0 8px 20px rgba(148,163,184,0.3)",
+        }}
+      >
+        <label
+          style={{
+            display: "block",
+            marginBottom: "6px",
+            fontSize: "13px",
+            fontWeight: 700,
+            color: "#111827",
+          }}
+        >
+          انتخاب دوره
+        </label>
+
+        <select
+          value={selectedCourseId}
+          onChange={async (e) => {
+            const courseId = e.target.value;
+            setSelectedCourseId(courseId);
+            await loadProjects(courseId);
+          }}
+
+          style={{
+            width: "100%",
+            padding: "9px 10px",
+            borderRadius: "10px",
+            border: "1px solid rgba(148,163,184,0.8)",
+            fontSize: "13px",
+          }}
+        >
+          {courses.map((course) => (
+            <option key={course.course_id} value={course.course_id}>
+              {course.title} - {course.access_role}
+            </option>
+          ))}
+        </select>
+      </section>
+
       {showIdeationIntro && (
         <div
           style={{
@@ -407,6 +571,7 @@ export default function MyProjectsPage({ participantId, participantName }) {
           >
             شروع هم‌آفرینی پروژه
           </h2>
+
           <p
             style={{
               margin: "0 0 12px",
@@ -431,7 +596,7 @@ export default function MyProjectsPage({ participantId, participantName }) {
             <ul style={{ paddingRight: "18px", margin: "8px 0 0" }}>
               <li>می‌توانید چندین پروژه گمانه‌زنی کنید.</li>
               <li>می‌توانید پروژه‌ی خود را چندین بار آپدیت کنید و مجدد فرم را پر کنید.</li>
-              <li>در نوشتن،خود را محدود نکنید.</li>
+              <li>در نوشتن، خود را محدود نکنید.</li>
             </ul>
           </div>
 
@@ -454,6 +619,7 @@ export default function MyProjectsPage({ participantId, participantName }) {
             >
               ادامه و ورود به پرسشنامه
             </button>
+
             <button
               type="button"
               onClick={handleIdeationCancel}
@@ -473,7 +639,6 @@ export default function MyProjectsPage({ participantId, participantName }) {
         </div>
       )}
 
-      {/* کارت مقدمه مایل‌ستون */}
       {showMilestoneIntro && milestoneProject && (
         <div
           style={{
@@ -485,81 +650,21 @@ export default function MyProjectsPage({ participantId, participantName }) {
             border: "1px solid rgba(226,232,240,0.9)",
           }}
         >
-          <h2
-            style={{
-              margin: "0 0 10px",
-              fontSize: "18px",
-              fontWeight: 800,
-              color: "#111827",
-            }}
-          >
+          <h2 style={{ margin: "0 0 10px", fontSize: "18px", fontWeight: 800, color: "#111827", lineHeight: 1.8 }}>
             کلمه‌ی «مایلستون» (Milestone) در اصل به معنی سنگ‌نشان‌هایی است که در جاده‌ها برای مشخص کردن فاصله‌ها نصب می‌شدند. این نشانه‌ها به مسافران کمک می‌کردند که بدانند چقدر از مسیر را طی کرده‌اند و چقدر تا مقصد باقی مانده است.
           </h2>
 
-          <p
-            style={{
-              margin: "0 0 10px",
-              fontSize: "14px",
-              color: "#374151",
-              lineHeight: 1.7,
-            }}
-          >
-           در پروژه‌ها نیز مایلستون‌ها همین نقش را دارند: نقاط کلیدی و قابل‌اندازه‌گیری در مسیر اجرای پروژه که رسیدن به آن‌ها نشان‌دهنده‌ی پیشرفت واقعی است. ثبت مایلستون‌ها در این فرم به ما کمک می‌کند تا:
-
-مسیر پروژه را شفاف‌تر ببینیم،
-
-عملکرد تیم و خودمان را ارزیابی کنیم،
-
-برنامه‌ریزی دقیق‌تری داشته باشیم،
-
-و از انحراف مسیر را تشخیص بدیم.
-
+          <p style={{ margin: "0 0 10px", fontSize: "14px", color: "#374151", lineHeight: 1.9 }}>
+            در پروژه‌ها نیز مایلستون‌ها همین نقش را دارند: نقاط کلیدی و قابل‌اندازه‌گیری در مسیر اجرای پروژه که رسیدن به آن‌ها نشان‌دهنده‌ی پیشرفت واقعی است. ثبت مایلستون‌ها در این فرم به ما کمک می‌کند تا مسیر پروژه را شفاف‌تر ببینیم، عملکرد تیم و خودمان را ارزیابی کنیم، برنامه‌ریزی دقیق‌تری داشته باشیم و  انحراف مسیر را تشخیص بدیم.
           </p>
 
-          <p
-            style={{
-              margin: "0 0 8px",
-              fontSize: "13px",
-              color: "#4b5563",
-              lineHeight: 1.7,
-            }}
-          >
-            
+          <p style={{ margin: "0 0 10px", fontSize: "13px", color: "#4b5563", lineHeight: 1.9 }}>
+            <strong>نکته مهم:</strong> این فرم به عنوان نقشه‌ی راه پروژه عمل می‌کند و ما را در رسیدن گام‌به‌گام به اهداف نهایی یاری می‌دهد. شما با پرکردن مایل‌ستون‌ها محدود یا وابسته به تحقق چیزهایی که گفتید نیستید.
           </p>
 
-          <p
-            style={{
-              margin: "0 0 8px",
-              fontSize: "12px",
-              color: "#6b7280",
-            }}
-          >
-            <strong>نکته مهم:</strong>این فرم به عنوان نقشه‌ی راه پروژه عمل می‌کند و ما را در رسیدن گام‌به‌گام به اهداف نهایی یاری می‌دهد.
 
 
-: شما با پرکردن مایل استون ها محدود یا وابسته به تحقق چیز هایی که گفتید نیستید.<br/>
-
-شما می توانید برای پر کردن فرم هربار از رهیار فراگیری خود کمک بگیرید.
-
-          </p>
-
-          <p
-            style={{
-              margin: "0 0 8px",
-              fontSize: "12px",
-              color: "#6b7280",
-            }}
-          >
-            
-          </p>
-
-          <p
-            style={{
-              margin: "6px 0 10px",
-              fontSize: "12px",
-              color: "#4b5563",
-            }}
-          >
+          <p style={{ margin: "6px 0 10px", fontSize: "12px", color: "#4b5563" }}>
             پروژه انتخاب‌شده:{" "}
             <strong>{milestoneProject.title || "پروژه بدون عنوان"}</strong>
           </p>
@@ -580,6 +685,7 @@ export default function MyProjectsPage({ participantId, participantName }) {
             >
               ادامه و ورود به فرم مایل‌ستون
             </button>
+
             <button
               type="button"
               onClick={handleMilestoneCancel}
@@ -599,7 +705,50 @@ export default function MyProjectsPage({ participantId, participantName }) {
         </div>
       )}
 
-      {/* کارت مقدمه عملکرد هفتگی */}
+
+      {showMilestoneForm && milestoneProject && (
+        <MilestoneForm
+          project={milestoneProject}
+          initialEntry={editingMilestoneEntry}
+          onSubmit={handleMilestoneSubmit}
+          onCancel={handleMilestoneCancel}
+        />
+      )}
+
+      {showWeeklyForm && weeklyProject && (
+        <WeeklyForm
+          project={weeklyProject}
+          initialEntry={editingWeeklyEntry}
+          onSubmit={handleWeeklySubmit}
+          onCancel={handleWeeklyCancel}
+        />
+      )}
+
+      {viewMilestonesProject && (
+        <MilestoneReadOnlyPanel
+          project={viewMilestonesProject}
+          entries={milestoneEntries}
+          loading={milestonesLoading}
+          onClose={handleCloseMilestoneView}
+          onDeleteMilestone={handleDeleteMilestone}
+          onEditMilestone={handleEditMilestone}
+        />
+      )}
+
+      {viewWeeklyProject && (
+        <WeeklyReadOnlyPanel
+          project={viewWeeklyProject}
+          entries={weeklyEntries}
+          loading={weeklyLoading}
+          onClose={handleCloseWeeklyView}
+          onToggleTaskDone={handleToggleWeeklyTaskDone}
+          onDeleteWeekly={handleDeleteWeekly}
+          onEditWeekly={handleEditWeekly}
+        />
+
+
+      )}
+
       {showWeeklyIntro && weeklyProject && (
         <div
           style={{
@@ -624,24 +773,25 @@ export default function MyProjectsPage({ participantId, participantName }) {
 
           <p
             style={{
-              margin: "0 0 8px",
+              margin: "0 0 10px",
               fontSize: "14px",
               color: "#374151",
-              lineHeight: 1.7,
+              lineHeight: 1.8,
             }}
           >
-           
+            در این بخش، اقدامات ۱-۳-۵ این هفته را برای پروژه خود مشخص می‌کنید:
+            یک اقدام حیاتی، سه اقدام مهم و پنج اقدام معمولی.
           </p>
 
           <p
             style={{
-              margin: "0 0 8px",
-              fontSize: "12px",
+              margin: "0 0 10px",
+              fontSize: "13px",
               color: "#4b5563",
-              lineHeight: 1.7,
+              lineHeight: 1.8,
             }}
           >
-           
+            این اقدامات را بر اساس فرم مایل‌ستون و مسیر پروژه انتخاب می‌کنید و تا پایان هفته انجام می‌دهید.
           </p>
 
           <p
@@ -671,6 +821,7 @@ export default function MyProjectsPage({ participantId, participantName }) {
             >
               شروع ثبت عملکرد این هفته
             </button>
+
             <button
               type="button"
               onClick={handleWeeklyCancel}
@@ -690,236 +841,190 @@ export default function MyProjectsPage({ participantId, participantName }) {
         </div>
       )}
 
-      {/* لیست پروژه‌ها */}
-      <section>
-        {loading && <p>در حال بارگذاری پروژه‌ها...</p>}
 
-        {!loading &&
-          projects.length === 0 &&
-          !showIdeationIntro &&
-          !showIdeationForm && (
-            <div
-              style={{
-                padding: "18px",
-                borderRadius: "16px",
-                background: "rgba(255,255,255,0.9)",
-                boxShadow: "0 8px 20px rgba(148,163,184,0.35)",
-                fontSize: "14px",
-                color: "#4b5563",
-              }}
-            >
-              هنوز هیچ پروژه‌ای ثبت نکرده‌ای. با دکمه «هم‌آفرینی پروژه جدید»
-              اولین پروژه‌ات را تعریف کن.
-            </div>
-          )}
-
-        {!loading &&
-          projects.map((p) => (
-            <div
-              key={p.id}
-              style={{
-                marginTop: "16px",
-                padding: "66px 98px",
-                borderRadius: "14px",
-                background: "#ffffff",
-                boxShadow: "0 6px 16px rgba(148,163,184,0.35)",
-                border: "1px solid rgba(226,232,240,0.9)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "10px",
-                }}
-              >
-                <div>
-                  <h3
-                    style={{
-                      margin: 0,
-                      fontSize: "16px",
-                      fontWeight: 700,
-                      color: "#111827",
-                    }}
-                  >
-                    {p.title || "پروژه بدون عنوان"}
-                  </h3>
-                  <p
-                    style={{
-                      margin: "4px 0 0",
-                      fontSize: "12px",
-                      color: "#6b7280",
-                    }}
-                  >
-                    آخرین به‌روزرسانی:{" "}
-                    {p.updated_at
-                      ? new Date(p.updated_at).toLocaleString("fa-IR")
-                      : p.created_at
-                      ? new Date(p.created_at).toLocaleString("fa-IR")
-                      : "-"}
-                  </p>
-                </div>
-
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                  {/* دکمه‌های مرتبط با پروژه */}
-                  <button
-                    onClick={() => handleOpenMilestone(p)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "999px",
-                      border: "none",
-                      background: "#ecfdf5",
-                      color: "#15803d",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    ثبت مایل‌ستون جدید
-                  </button>
-
-                  <button
-                    onClick={() => handleViewMilestones(p)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "999px",
-                      border: "none",
-                      background: "#ecfdf5",
-                      color: "#15803d",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    مشاهده مایل‌ستون‌ها
-                  </button>
-
-                  <button
-                    onClick={() => handleOpenWeekly(p)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "999px",
-                      border: "none",
-                      background: "#fefce8",
-                      color: "#92400e",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    ثبت عملکرد هفتگی
-                  </button>
-
-                  <button
-                    onClick={() => handleViewWeeklyHistory(p)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "999px",
-                      border: "none",
-                      background: "#fefce8",
-                      color: "#92400e",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    هفته‌های قبل (عملکرد هفتگی)
-                  </button>
-
-                  <button
-                    onClick={() => handleEditProject(p)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "999px",
-                      border: "none",
-                      background: "#e0ecff",
-                      color: "#1d4ed8",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    ویرایش پروژه
-                  </button>
-                  <button
-                    onClick={() => handleDeleteProject(p.id)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "999px",
-                      border: "none",
-                      background: "#fee2e2",
-                      color: "#b91c1c",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    حذف
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-      </section>
-
-      {/* فرم گمانه‌زنی */}
       {showIdeationForm && (
         <ProjectIdeationForm
           initialProject={editingProject}
-          participantId={participantId}
+          participantId={user?.id}
           onSubmit={handleIdeationFormSubmit}
           onCancel={handleIdeationCancel}
         />
       )}
 
-      {/* فرم مایل‌ستون (ثبت جدید) */}
-      {showMilestoneForm && milestoneProject && (
-        <MilestoneForm
-          project={milestoneProject}
-          participantId={participantId}
-          onSubmit={handleMilestoneSubmit}
-          onCancel={handleMilestoneCancel}
-        />
-      )}
+      <section>
+        {projects.length === 0 && !showIdeationIntro && !showIdeationForm && (
+          <div
+            style={{
+              padding: "18px",
+              borderRadius: "16px",
+              background: "rgba(255,255,255,0.9)",
+              boxShadow: "0 8px 20px rgba(148,163,184,0.35)",
+              fontSize: "14px",
+              color: "#4b5563",
+            }}
+          >
+            هنوز هیچ پروژه‌ای ثبت نکرده‌ای.
+          </div>
+        )}
 
-      {/* نمایش فقط‌خواندنی مایل‌ستون‌ها */}
-      {viewMilestonesProject && (
-        <MilestoneReadOnlyPanel
-          project={viewMilestonesProject}
-          entries={milestoneEntries}
-          loading={milestonesLoading}
-          onClose={handleCloseMilestoneView}
-        />
-      )}
+        {projects.map((project) => (
+          <div
+            key={project.id}
+            style={{
+              marginTop: "16px",
+              padding: "18px",
+              borderRadius: "14px",
+              background: "#ffffff",
+              boxShadow: "0 6px 16px rgba(148,163,184,0.35)",
+              border: "1px solid rgba(226,232,240,0.9)",
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "16px",
+                fontWeight: 700,
+                color: "#111827",
+              }}
+            >
+              {project.title || "پروژه بدون عنوان"}
+            </h3>
 
-      {/* فرم عملکرد هفتگی (ثبت جدید) */}
-      {showWeeklyForm && weeklyProject && (
-        <WeeklyForm
-          project={weeklyProject}
-          onSubmit={handleWeeklySubmit}
-          onCancel={handleWeeklyCancel}
-        />
-      )}
+            <p
+              style={{
+                margin: "4px 0 0",
+                fontSize: "12px",
+                color: "#6b7280",
+              }}
+            >
+              آخرین به‌روزرسانی:{" "}
+              {project.updated_at
+                ? new Date(project.updated_at).toLocaleString("fa-IR")
+                : "-"}
+            </p>
 
-      {/* پنل هفته‌های قبل (کرگره‌ای) */}
-      {weeklyHistoryProject && (
-        <WeeklyHistoryPanel
-          project={weeklyHistoryProject}
-          entries={weeklyEntries}
-          loading={weeklyLoading}
-          onClose={handleCloseWeeklyHistory}
-          onToggleTaskDone={handleToggleWeeklyTaskDone}
-        />
-      )}
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                marginTop: "12px",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                onClick={() => handleEditProject(project)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#e0ecff",
+                  color: "#1d4ed8",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
+              >
+                ویرایش پروژه
+              </button>
 
-      <LogoutButton onLogout={() => (window.location.href = "/")} />
+              <button
+                onClick={() => handleDeleteProject(project.id)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
+              >
+                حذف پروژه
+              </button>
+            </div>
+
+
+
+            <div
+              style={{
+                display: "flex",
+                gap: "6px",
+                flexWrap: "wrap",
+                marginTop: "12px",
+              }}
+            >
+              <button
+                onClick={() => handleOpenMilestone(project)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#ecfdf5",
+                  color: "#15803d",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
+              >
+                ثبت مایل‌ستون جدید
+              </button>
+
+
+              <button
+                onClick={() => handleViewMilestones(project)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#ecfdf5",
+                  color: "#15803d",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
+              >
+                مشاهده مایل‌ستون‌ها
+              </button>
+
+
+              <button
+                onClick={() => handleOpenWeekly(project)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#fefce8",
+                  color: "#92400e",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
+              >
+                ثبت عملکرد هفتگی
+              </button>
+
+
+              <button
+                onClick={() => handleViewWeekly(project)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#fefce8",
+                  color: "#92400e",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
+              >
+                هفته‌های قبل
+              </button>
+
+            </div>
+
+
+          </div>
+        ))}
+      </section>
     </div>
   );
 }
-
-// --------------------------
-// پنل فقط‌خواندنی مایل‌ستون‌ها
-// --------------------------
-
-function MilestoneReadOnlyPanel({ project, entries, loading, onClose }) {
+function MilestoneReadOnlyPanel({ project, entries, loading, onClose, onDeleteMilestone, onEditMilestone }) {
   const containerStyle = {
     marginTop: "24px",
     marginBottom: "32px",
@@ -943,23 +1048,10 @@ function MilestoneReadOnlyPanel({ project, entries, loading, onClose }) {
         }}
       >
         <div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "16px",
-              fontWeight: 800,
-              color: "#111827",
-            }}
-          >
+          <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#111827" }}>
             مایل‌ستون‌های ثبت‌شده
           </h2>
-          <p
-            style={{
-              margin: "4px 0 0",
-              fontSize: "12px",
-              color: "#4b5563",
-            }}
-          >
+          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#4b5563" }}>
             پروژه: <strong>{project.title || "پروژه بدون عنوان"}</strong>
           </p>
         </div>
@@ -980,18 +1072,10 @@ function MilestoneReadOnlyPanel({ project, entries, loading, onClose }) {
         </button>
       </div>
 
-      {loading && (
-        <p style={{ fontSize: "13px" }}>در حال بارگذاری مایل‌ستون‌ها...</p>
-      )}
+      {loading && <p style={{ fontSize: "13px" }}>در حال بارگذاری مایل‌ستون‌ها...</p>}
 
       {!loading && entries.length === 0 && (
-        <p
-          style={{
-            fontSize: "13px",
-            color: "#6b7280",
-            marginTop: "4px",
-          }}
-        >
+        <p style={{ fontSize: "13px", color: "#6b7280", marginTop: "4px" }}>
           هنوز هیچ مایل‌ستونی برای این پروژه ثبت نکرده‌ای.
         </p>
       )}
@@ -1001,7 +1085,15 @@ function MilestoneReadOnlyPanel({ project, entries, loading, onClose }) {
           const created = entry.created_at
             ? new Date(entry.created_at).toLocaleString("fa-IR")
             : "";
-          const answers = entry.answers || {};
+
+          const rawAnswers = entry.answers || {};
+
+          const answers = { ...rawAnswers };
+
+          delete answers.m1_w4;
+          delete answers.m5_w4;
+          delete answers.m7_w4;
+
 
           return (
             <div
@@ -1022,35 +1114,216 @@ function MilestoneReadOnlyPanel({ project, entries, loading, onClose }) {
                   marginBottom: "6px",
                 }}
               >
-                <div>
-                  <strong style={{ fontSize: "13px" }}>
-                    ثبت شماره {index + 1}
-                  </strong>
-                  {entry.period_label && (
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        color: "#6b7280",
-                        marginRight: "6px",
-                      }}
-                    >
-                      ({entry.period_label})
-                    </span>
-                  )}
-                </div>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    color: "#6b7280",
-                  }}
-                >
+                <strong style={{ fontSize: "13px" }}>ثبت شماره {index + 1}</strong>
+
+                <span style={{ fontSize: "11px", color: "#6b7280" }}>
                   تاریخ ثبت: {created}
                 </span>
+
+                <button
+                  type="button"
+                  onClick={() => onEditMilestone(entry)}
+                  style={{
+                    border: "none",
+                    borderRadius: "999px",
+                    padding: "4px 10px",
+                    background: "#dbeafe",
+                    color: "#1d4ed8",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  ویرایش
+                </button>
+
+
+                <button
+                  type="button"
+                  onClick={() => onDeleteMilestone(entry.id)}
+                  style={{
+                    border: "none",
+                    borderRadius: "999px",
+                    padding: "4px 10px",
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  حذف
+                </button>
+
               </div>
 
-              {MILESTONE_FIELDS.map((field) => {
-                const value = answers[field.key];
-                if (!value) return null;
+              {MILESTONE_FIELDS
+                .filter((field) => !["m1_w4", "m5_w4", "m7_w4"].includes(field.key))
+                .map((field) => {
+                  const value = answers[field.key];
+
+                  if (!value || (!value.text && !value.date)) return null;
+
+                  return (
+                    <div
+                      key={field.key}
+                      style={{
+                        marginTop: "8px",
+                        paddingTop: "6px",
+                        borderTop: "1px dashed rgba(209,213,219,0.9)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          color: "#111827",
+                          marginBottom: "3px",
+                        }}
+                      >
+                        {field.label}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#111827",
+                          whiteSpace: "pre-wrap",
+                          lineHeight: 1.8,
+                        }}
+                      >
+                        {value.date && (
+                          <>
+                            <strong>تاریخ هدف: </strong>
+                            {value.date}
+                            <br />
+                          </>
+                        )}
+
+                        {value.text}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
+function WeeklyReadOnlyPanel({ project, entries, loading, onClose, onToggleTaskDone, onDeleteWeekly, onEditWeekly }) {
+  const containerStyle = {
+    marginTop: "24px",
+    marginBottom: "32px",
+    padding: "18px 16px",
+    borderRadius: "18px",
+    background: "rgba(255,255,255,0.98)",
+    boxShadow: "0 10px 28px rgba(15,23,42,0.3)",
+    border: "1px solid rgba(226,232,240,0.9)",
+    maxHeight: "70vh",
+    overflowY: "auto",
+  };
+
+  return (
+    <div style={containerStyle}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#111827" }}>
+            عملکرد هفتگی‌های ثبت‌شده
+          </h2>
+          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#4b5563" }}>
+            پروژه: <strong>{project.title || "پروژه بدون عنوان"}</strong>
+          </p>
+        </div>
+
+        <button onClick={onClose} style={{ padding: "6px 12px", borderRadius: "999px", border: "none", background: "#e5e7eb", color: "#374151", fontSize: "12px", cursor: "pointer" }}>
+          بستن
+        </button>
+      </div>
+
+      {loading && <p style={{ fontSize: "13px" }}>در حال بارگذاری عملکرد هفتگی‌ها...</p>}
+
+      {!loading && entries.length === 0 && (
+        <p style={{ fontSize: "13px", color: "#6b7280" }}>
+          هنوز هیچ عملکرد هفتگی برای این پروژه ثبت نکرده‌ای.
+        </p>
+      )}
+
+      {!loading &&
+        entries.map((entry, index) => {
+          const created = entry.created_at
+            ? new Date(entry.created_at).toLocaleString("fa-IR")
+            : "";
+
+          const tasks = entry.tasks || {};
+
+          const visibleTasks = WEEKLY_TASK_FIELDS
+            .map((field) => ({
+              field,
+              item: tasks[field.key],
+            }))
+            .filter(({ item }) => item && item.text);
+
+          const doneCount = visibleTasks.filter(({ item }) => item.done).length;
+          const totalCount = visibleTasks.length;
+
+
+          return (
+            <div key={entry.id || index} style={{ marginTop: "12px", padding: "12px", borderRadius: "14px", border: "1px solid rgba(226,232,240,0.9)", background: "#f9fafb" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <strong style={{ fontSize: "13px" }}>
+                  {entry.week_label || `ثبت شماره ${index + 1}`}
+                </strong>
+
+                <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                  تاریخ ثبت: {created}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => onEditWeekly(entry)}
+                  style={{
+                    border: "none",
+                    borderRadius: "999px",
+                    padding: "4px 10px",
+                    background: "#dbeafe",
+                    color: "#1d4ed8",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  ویرایش
+                </button>
+
+
+                <button
+                  type="button"
+                  onClick={() => onDeleteWeekly(entry.id)}
+                  style={{
+                    border: "none",
+                    borderRadius: "999px",
+                    padding: "4px 10px",
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  حذف
+                </button>
+
+
+                <div style={{ fontSize: "12px", color: "#374151", marginBottom: "8px" }}>
+                  تسک‌های تعریف‌شده: {totalCount}
+                  <br />
+                  تسک‌های انجام‌شده: {doneCount}
+                </div>
+
+              </div>
+
+              {WEEKLY_TASK_FIELDS.map((field) => {
+                const item = tasks[field.key];
+
+                if (!item || !item.text) return null;
 
                 return (
                   <div
@@ -1071,30 +1344,63 @@ function MilestoneReadOnlyPanel({ project, entries, loading, onClose }) {
                     >
                       {field.label}
                     </div>
-                    {field.subtitle && (
-                      <div
-                        style={{
-                          fontSize: "11px",
-                          color: "#6b7280",
-                          marginBottom: "3px",
-                        }}
-                      >
-                        {field.subtitle}
-                      </div>
-                    )}
+
                     <div
                       style={{
                         fontSize: "12px",
                         color: "#111827",
                         whiteSpace: "pre-wrap",
                         lineHeight: 1.8,
+                        textDecoration: item.done ? "line-through" : "none",
+                        opacity: item.done ? 0.6 : 1,
+                        marginBottom: "6px",
                       }}
                     >
-                      {value}
+                      {item.text}
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-start",
+                        direction: "rtl",
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          fontSize: "11px",
+                          color: "#374151",
+                          cursor: "pointer",
+                          background: item.done ? "#dcfce7" : "#f3f4f6",
+                          padding: "3px 8px",
+                          borderRadius: "999px",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!item.done}
+                          onChange={(e) =>
+                            onToggleTaskDone(entry.id, field.key, e.target.checked)
+                          }
+                        />
+                        انجام شد
+                      </label>
                     </div>
                   </div>
                 );
+
               })}
+
+              {entry.share_targets && (
+                <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px solid rgba(209,213,219,0.9)", fontSize: "12px", color: "#111827", whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+                  <strong>افرادی که پروژه به آن‌ها معرفی می‌شود:</strong>
+                  <br />
+                  {entry.share_targets}
+                </div>
+              )}
             </div>
           );
         })}
@@ -1102,264 +1408,3 @@ function MilestoneReadOnlyPanel({ project, entries, loading, onClose }) {
   );
 }
 
-// --------------------------
-// پنل کرگره‌ای هفته‌های قبل
-// --------------------------
-
-function WeeklyHistoryPanel({ project, entries, loading, onClose,onToggleTaskDone }) {
-  const containerStyle = {
-    marginTop: "24px",
-    marginBottom: "32px",
-    padding: "18px 16px",
-    borderRadius: "18px",
-    background: "rgba(255,255,255,0.98)",
-    boxShadow: "0 10px 28px rgba(15,23,42,0.3)",
-    border: "1px solid rgba(226,232,240,0.9)",
-    maxHeight: "70vh",
-    overflowY: "auto",
-  };
-
-  return (
-    <div style={containerStyle}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "10px",
-        }}
-      >
-        <div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "16px",
-              fontWeight: 800,
-              color: "#111827",
-            }}
-          >
-            عملکرد هفتگی‌های ثبت‌شده
-          </h2>
-          <p
-            style={{
-              margin: "4px 0 0",
-              fontSize: "12px",
-              color: "#4b5563",
-            }}
-          >
-            پروژه: <strong>{project.title || "پروژه بدون عنوان"}</strong>
-          </p>
-        </div>
-
-        <button
-          onClick={onClose}
-          style={{
-            padding: "6px 12px",
-            borderRadius: "999px",
-            border: "none",
-            background: "#e5e7eb",
-            color: "#374151",
-            fontSize: "12px",
-            cursor: "pointer",
-          }}
-        >
-          بستن
-        </button>
-      </div>
-
-      {loading && (
-        <p style={{ fontSize: "13px" }}>در حال بارگذاری عملکرد هفتگی‌ها...</p>
-      )}
-
-      {!loading && entries.length === 0 && (
-        <p
-          style={{
-            fontSize: "13px",
-            color: "#6b7280",
-            marginTop: "4px",
-          }}
-        >
-          هنوز هیچ فرم عملکرد هفتگی برای این پروژه ثبت نکرده‌ای.
-        </p>
-      )}
-
-      {!loading && entries.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: "12px",
-            marginTop: "8px",
-          }}
-        >
-          {entries.map((entry) => {
-            const created = entry.created_at
-              ? new Date(entry.created_at).toLocaleString("fa-IR")
-              : "";
-            const tasks = entry.tasks || {};
-            const shareTargets = entry.share_targets || "";
-
-            const totalDefined = WEEKLY_TASK_FIELDS.filter(
-              (f) =>
-                tasks[f.key] &&
-                tasks[f.key].text &&
-                tasks[f.key].text.trim()
-            ).length;
-
-            const doneCount = WEEKLY_TASK_FIELDS.filter(
-              (f) => tasks[f.key] && tasks[f.key].done
-            ).length;
-
-            return (
-              <div
-                key={entry.id}
-                style={{
-                  padding: "12px",
-                  borderRadius: "14px",
-                  border: "1px solid rgba(226,232,240,0.9)",
-                  background: "#f9fafb",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "6px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: "6px",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        color: "#111827",
-                      }}
-                    >
-                      {entry.week_label || "فرم هفتگی"}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "#6b7280",
-                      }}
-                    >
-                      تاریخ ثبت: {created}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      color: "#4b5563",
-                      textAlign: "left",
-                    }}
-                  >
-                    <div>تسک‌های تعریف‌شده: {totalDefined}</div>
-                    <div>تسک‌های انجام‌شده: {doneCount}</div>
-                  </div>
-                </div>
-
-                {/* تسک‌ها */}
-                <div
-                  style={{
-                    marginTop: "4px",
-                    paddingTop: "4px",
-                    borderTop: "1px dashed rgba(209,213,219,0.9)",
-                    maxHeight: "220px",
-                    overflowY: "auto",
-                  }}
-                >
-                  {WEEKLY_TASK_FIELDS.map((field) => {
-                    const item = tasks[field.key];
-                    if (!item || !item.text || !item.text.trim()) return null;
-
-                    return (
-                      <div
-                        key={field.key}
-                        style={{
-                          marginBottom: "6px",
-                          paddingBottom: "4px",
-                          borderBottom:
-                            "1px dashed rgba(209,213,219,0.8)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: "6px",
-                            marginBottom: "2px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#111827",
-                            }}
-                          >
-                            {field.label}
-                          </span>
-                          <label
-                            style={{
-                              fontSize: "11px",
-                              color: "#374151",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={!!item.done}
-                              onChange={(e)=>onToggleTaskDone(entry.id,field.key,e.target.checked)}
-                              
-                            />
-                            انجام شد
-                          </label>
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "#111827",
-                            whiteSpace: "pre-wrap",
-                            lineHeight: 1.7,
-                          }}
-                        >
-                          {item.text}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {shareTargets && (
-                  <div
-                    style={{
-                      marginTop: "4px",
-                      paddingTop: "4px",
-                      borderTop: "1px solid rgba(209,213,219,0.9)",
-                      fontSize: "12px",
-                      color: "#111827",
-                      whiteSpace: "pre-wrap",
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    <strong>افرادی که پروژه به آن‌ها معرفی می‌شود:</strong>
-                    <br />
-                    {shareTargets}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
