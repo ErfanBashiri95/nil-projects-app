@@ -147,8 +147,8 @@ Version
 Current Version: 2.0.0
 
 
-Author
+Developers
 
-Erfan Bashiri
+Erfan Bashiri/Ali Bashiri
 
 Developed as a professional coaching and project accountability platform.
