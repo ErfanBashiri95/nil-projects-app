@@ -151,4 +151,17 @@ Developers
 
 Erfan Bashiri/Ali Bashiri
 
+**About the Developers**
+
+Ali Bashiri — Front-End Development & UI/UX
+Development of React-based user interface components
+UI/UX design and visual organization of project information
+Implementation and refinement of project and milestone interfaces
+Functional testing, debugging, and troubleshooting
+Erfan Bashiri — Back-End Development & System Integration
+PHP back-end development and API integration
+MySQL database integration
+Authentication and server-side functionality
+System integration, deployment, and repository management
+
 Developed as a professional coaching and project accountability platform.
