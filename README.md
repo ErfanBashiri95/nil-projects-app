@@ -2,11 +2,11 @@ NIL Project V2
 
 A professional project execution and accountability platform developed for coaching, mentoring, and educational programs.
 
-Overview
+**Overview**
 
-NIL Project V2 is a goal execution and project tracking system that helps participants transform ideas into measurable outcomes through structured milestones, weekly accountability, progress tracking, and detailed reporting.
-
-The platform was designed and implemented as a complete full-stack solution including frontend, backend APIs, authentication, role-based access control, reporting, and database integration.
+NIL Project is a web-based project management platform designed to organize and present projects, milestones, and related information through a structured interface.
+The application was collaboratively developed by Ali Bashiri and Erfan Bashiri, combining front-end development, UI/UX design, back-end functionality, database integration, and testing.
+Both developers shared responsibility for the project while focusing on complementary technical areas.
 
 
 Key Features
